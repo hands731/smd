@@ -148,6 +148,8 @@ async def handle_messages(websocket):
                 }
                 await websocket.send(json.dumps(response))
 
+
+
 async def send_data_to_server(uri):
     while True:
         try:
@@ -155,19 +157,13 @@ async def send_data_to_server(uri):
                 await send_initial_status(websocket)
 
                 # 메시지 처리 태스크 시작
-                await asyncio.gather(
-                    handle_messages(websocket),
-                    send_color_status_periodically(websocket)
-                )
+                asyncio.create_task(handle_messages(websocket))
+                asyncio.create_task(send_color_status_periodically(websocket))
+                asyncio.create_task(fetch_and_send_xml_data(websocket))
 
-                while True:
-                    xml_data = await get_xml_data()
-                    if xml_data:
-                        dict_list = getMyDict(xml_data)
-                        for data in dict_list:
-                            data["status"] = "mtconnect"
-                            await websocket.send(json.dumps(data))
-                    await asyncio.sleep(1)
+                # 웹소켓 연결 유지
+                await websocket.wait_closed()
+
         except (websockets.ConnectionClosed, ConnectionRefusedError, websockets.InvalidURI, websockets.InvalidHandshake) as e:
             print(f"Connection failed: {e}. Reconnecting in 5 seconds...")
             await asyncio.sleep(5)  # 재연결 시도 전 대기 시간
@@ -175,11 +171,15 @@ async def send_data_to_server(uri):
             print(f"Unexpected error: {e}. Reconnecting in 10 seconds...")
             await asyncio.sleep(10)  # 예상치 못한 오류 발생 시 재연결 시도 전 대기 시간
 
-
-
-
-
-
+async def fetch_and_send_xml_data(websocket):
+    while True:
+        xml_data = await get_xml_data()
+        if xml_data:
+            dict_list = getMyDict(xml_data)
+            for data in dict_list:
+                data["status"] = "mtconnect"
+                await websocket.send(json.dumps(data))
+        await asyncio.sleep(1)
 
 
 
