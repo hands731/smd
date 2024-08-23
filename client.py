@@ -64,7 +64,6 @@ def get_MTConnect_status():
     if os.popen(command).read().strip():
         return "O"
     return "X"
-
 def get_device_info():
     hostname = socket.gethostname()
     intern_ip = get_ip_address('wlan0')
@@ -85,14 +84,6 @@ def get_device_info():
         "cpu_serial": cpu_serial
     }
 
-async def get_xml_data():
-    try:
-        result = subprocess.check_output('curl http://localhost:5000/current', shell=True)
-        xml_data = result.decode('utf-8')
-        return xml_data
-    except subprocess.CalledProcessError as e:
-        print(f"Failed to get XML data: {e}")
-    return None
 
 async def send_initial_status(websocket):
     device_info = get_device_info()
@@ -150,21 +141,6 @@ async def handle_messages(websocket):
 
 
 
-async def fetch_and_send_xml_data(websocket):
-    while True:
-        xml_data = await get_xml_data()
-        if xml_data:
-            dict_list = getMyDict(xml_data)
-            for data in dict_list:
-                data["status"] = "mtconnect"
-                await websocket.send(json.dumps(data))
-        await asyncio.sleep(1)
-
-
-
-
-
-
 
 async def send_color_status_periodically(websocket):
     while True:
@@ -173,76 +149,6 @@ async def send_color_status_periodically(websocket):
         await websocket.send(status_message)
         print(f"Sent status: color: {status_message}")
         await asyncio.sleep(60)  # 1분마다 전송
-
-
-
-def getMyDict(xml_data):
-    executor = ThreadPoolExecutor(max_workers=6)
-
-    root = ET.fromstring(xml_data)
-    namespace_match = re.match(r'\{.*\}', root.tag)
-    if not namespace_match:
-        raise ValueError("Namespace not found in XML data")
-
-    namespace_url = namespace_match.group(0).strip('{}')
-    namespaces = {'m': namespace_url}
-
-    dict_list = []
-
-    for device_stream in root.findall('m:Streams/m:DeviceStream', namespaces):
-        data_dict = {}
-        data_dict['name'] = device_stream.get('name')
-        for component_stream in device_stream.findall('m:ComponentStream', namespaces):
-            for event in component_stream.findall('m:Events/*', namespaces):
-                data_dict[event.get('name')] = event.text
-
-        for key in [None, 'avail', 'line']:
-            if key in data_dict:
-                del data_dict[key]
-
-        for old_key, new_key in [('tool_id', 'toolID'), ('program_comment', 'program'), ('part_count', 'partCount'), ('estop', 'Estop')]:
-            if old_key in data_dict:
-                data_dict[new_key] = data_dict.pop(old_key)
-        data_dict['cpu_serial'] = cpu_serial
-        data_dict['datetime'] = datetime.datetime.now().isoformat()
-        dict_list.append(data_dict)
-    result_list = []
-    for d in dict_list:
-        result = handle_isEquip_OFF(d)
-        result_list.append(result)
-    executor.shutdown(wait=True)
-
-    return result_list
-
-def handle_isEquip_OFF(temp_dict):
-    temp_dict["operationType"] = classifyOperationType(temp_dict)
-    if temp_dict["partCount"] == "UNAVAILABLE":
-        temp_dict["partCount"] = 0
-
-    return temp_dict
-
-def classifyOperationType(myDict):
-    if myDict["execution"] == "UNAVAILABLE":
-        return "EQUIP_OFF"
-    elif myDict["execution"] == "ACTIVE":
-        return "PGM_ACTIVE"
-    else:
-        return "PGM_STOP"
-
-def makeExecution(myDict, strr):
-    myDict["execution"] = strr
-    myDict["operationType"] = strr
-    myDict["partCount"] = 0
-    myDict["program"] = myDict["program"]
-    myDict["message"] = myDict["message"]
-    myDict["toolID"] = myDict["toolID"]
-    myDict["mode"] = myDict["mode"]
-    myDict["block"] = myDict["block"]
-    return myDict
-
-
-
-
 
 
 
@@ -265,18 +171,18 @@ def update_autostart_url(new_url, seq):
             hostname_to_set = url_parts[-1]
         else:
             hostname_to_set = url_parts[-2]
-
+        print("1111111111111111111")
         # 읽기 권한으로 파일을 열기
         with open(autostart_path, 'r') as file:
             lines = file.readlines()
-
+        print("22222222222")
         # 임시 파일에 쓰기
         with open('/tmp/autostart', 'w') as temp_file:
             for line in lines:
                 if 'http://' in line or 'https://' in line:
                     line = re.sub(r'(https?://[^\s]+)', new_url, line)
                 temp_file.write(line)
-
+        print("33333333333333")
         # 임시 파일을 실제 파일로 이동
         subprocess.call('sudo mv /tmp/autostart {}'.format(autostart_path), shell=True)
         print("Autostart URL updated to: {}".format(new_url))
@@ -297,7 +203,7 @@ def update_autostart_url(new_url, seq):
                 else:
                     file.write(line)
         subprocess.call('sudo mv /tmp/hosts /etc/hosts', shell=True)
-
+        print("555555555555")
         print("/etc/hostname and /etc/hosts updated to: {}".format(hostname_to_set))
 
         subprocess.call('sudo hostnamectl set-hostname {}'.format(hostname_to_set), shell=True)
@@ -352,6 +258,7 @@ def capture_screenshot():
     screenshot_path = "/tmp/screenshot.png"
     return screenshot_path if os.path.exists(screenshot_path) else None
 
+
 async def main():
     initialize_cpu_serial()  # CPU 시리얼을 초기화합니다.
     uri = "ws://106.240.243.250:8888/ws/mtconnect_socket/"
@@ -362,7 +269,6 @@ async def main():
                 await send_initial_status(websocket)
                 asyncio.create_task(handle_messages(websocket))
                 asyncio.create_task(send_color_status_periodically(websocket))
-                asyncio.create_task(fetch_and_send_xml_data(websocket))
 
                 # WebSocket 연결을 유지함
                 await websocket.wait_closed()
