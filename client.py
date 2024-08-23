@@ -150,27 +150,6 @@ async def handle_messages(websocket):
 
 
 
-async def send_data_to_server(uri):
-    while True:
-        try:
-            async with websockets.connect(uri) as websocket:
-                await send_initial_status(websocket)
-
-                # 메시지 처리 태스크 시작
-                asyncio.create_task(handle_messages(websocket))
-                asyncio.create_task(send_color_status_periodically(websocket))
-                asyncio.create_task(fetch_and_send_xml_data(websocket))
-
-                # 웹소켓 연결 유지
-                await websocket.wait_closed()
-
-        except (websockets.ConnectionClosed, ConnectionRefusedError, websockets.InvalidURI, websockets.InvalidHandshake) as e:
-            print(f"Connection failed: {e}. Reconnecting in 5 seconds...")
-            await asyncio.sleep(5)  # 재연결 시도 전 대기 시간
-        except Exception as e:
-            print(f"Unexpected error: {e}. Reconnecting in 10 seconds...")
-            await asyncio.sleep(10)  # 예상치 못한 오류 발생 시 재연결 시도 전 대기 시간
-
 async def fetch_and_send_xml_data(websocket):
     while True:
         xml_data = await get_xml_data()
@@ -195,13 +174,7 @@ async def send_color_status_periodically(websocket):
         print(f"Sent status: color: {status_message}")
         await asyncio.sleep(60)  # 1분마다 전송
 
-async def process_and_send(uri):
-    while True:
-        try:
-            await send_data_to_server(uri)
-        except (websockets.ConnectionClosed, ConnectionRefusedError, websockets.InvalidURI, websockets.InvalidHandshake) as e:
-            print(f"Connection failed: {e}")
-            await asyncio.sleep(5)
+
 
 def getMyDict(xml_data):
     executor = ThreadPoolExecutor(max_workers=6)
@@ -382,7 +355,24 @@ def capture_screenshot():
 async def main():
     initialize_cpu_serial()  # CPU 시리얼을 초기화합니다.
     uri = "ws://106.240.243.250:8888/ws/mtconnect_socket/"
-    await process_and_send(uri)
+
+    while True:
+        try:
+            async with websockets.connect(uri) as websocket:
+                await send_initial_status(websocket)
+                asyncio.create_task(handle_messages(websocket))
+                asyncio.create_task(send_color_status_periodically(websocket))
+                asyncio.create_task(fetch_and_send_xml_data(websocket))
+
+                # WebSocket 연결을 유지함
+                await websocket.wait_closed()
+
+        except (websockets.ConnectionClosed, ConnectionRefusedError, websockets.InvalidURI, websockets.InvalidHandshake) as e:
+            print(f"Connection failed: {e}. Reconnecting in 5 seconds...")
+            await asyncio.sleep(5)  # 재연결 시도 전 대기 시간
+        except Exception as e:
+            print(f"Unexpected error: {e}. Reconnecting in 10 seconds...")
+            await asyncio.sleep(10)
 
 if __name__ == "__main__":
     asyncio.run(main())
