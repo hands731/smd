@@ -150,6 +150,7 @@ async def handle_messages(websocket):
 
 
 
+
 async def fetch_and_send_xml_data(websocket):
     while True:
         xml_data = await get_xml_data()
