@@ -150,7 +150,6 @@ async def handle_messages(websocket):
 
 
 
-
 async def fetch_and_send_xml_data(websocket):
     while True:
         xml_data = await get_xml_data()
@@ -329,14 +328,16 @@ def connect_ssh():
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
         stdout, stderr = process.communicate()
+        print("STDOUT:", stdout.decode())
+        print("STDERR:", stderr.decode())
         if process.returncode == 0:
             print("SSH tunnel established")
         else:
             print("Failed to establish SSH tunnel")
-        return stdout.decode(), stderr.decode()  # bytes -> str로 변환
+        return stdout, stderr
     except Exception as e:
         print("Error: {}".format(e))
-        return "", str(e)  # 에러 메시지를 stderr로 반환
+        return "", str(e)  # Add error message to stderr
 
 # 새로운 execute_command 함수 추가
 def execute_command(command):
