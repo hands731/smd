@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MTConnectDevices xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns="urn:mtconnect.org:MTConnectDevices:2.2"
+                  xmlns:m="urn:mtconnect.org:MTConnectDevices:2.2"
+                  xsi:schemaLocation="urn:mtconnect.org:MTConnectDevices:2.2 http://www.mtconnect.org/schemas/MTConnectDevices_2.2.xsd">
+  <Header creationTime="2009-03-22T01:50:29+00:00" sender="localhost" instanceId="1237628993"
+    bufferSize="100000" version="2.2" deviceModelChangeTime="2022-06-01T00:00:00" assetBufferSize="1024" assetCount="0"/>
+
+  <Devices>
+    <Device name="NC4-1" uuid="NC4-1" id="mt_01">
+      <DataItems>
+        <DataItem type="AVAILABILITY" category="EVENT" id="mt_02" name="avail"/>
+        <DataItem type="EMERGENCY_STOP" category="EVENT" id="mt_03" name="estop"/>
+      </DataItems>
+      <Components>
+        <Controller name="controller" id="controller_45">
+          <DataItems>
+            <DataItem category="SAMPLE" id="mt_04" name="TAtOpeT1_1" nativeUnits="SECOND" type="ACCUMULATED_TIME" units="SECOND"/>
+          </DataItems>
+          <Components>
+            <Path name="path1" id="mt_05">
+              <DataItems>
+                <!-- Events -->
+                <DataItem type="TOOL_ID" category="EVENT" id="mt_06" name="tool_id"/>
+                <DataItem type="EXECUTION" category="EVENT" id="mt_07" name="execution"/>
+                <DataItem type="CONTROLLER_MODE" category="EVENT" id="mt_08" name="mode"/>
+                <DataItem type="x:PROGRAM_COMMENT" category="EVENT" id="mt_09" name="program_comment"/>
+                <DataItem type="BLOCK" category="EVENT" id="mt_10" name="block"/>
+                <DataItem type="PART_COUNT" category="EVENT" id="mt_11" name="part_count"/>
+                <DataItem type="LINE" category="EVENT" id="mt_12" name="line"/>
+                <DataItem category="SAMPLE" id="mt_13" name="CycT1_1" nativeUnits="SECOND" type="ACCUMULATED_TIME" units="SECOND"/>
+              </DataItems>
+            </Path>
+          </Components>
+          <DataItems>
+            <DataItem type="MESSAGE" category="EVENT" id="mt_14" name="message"/>
+            <DataItem type="PATH_FEEDRATE" category="SAMPLE" id="mt_15" name="Fovr" subType="OVERRIDE" units="PERCENT" nativeUnits="PERCENT"/>
+            <DataItem type="SPINDLE_SPEED" category="SAMPLE" id="mt_16" name="SspeedOvr" subType="OVERRIDE" units="PERCENT" nativeUnits="PERCENT"/>
+          </DataItems>
+          <Condition type="SYSTEM" category="CONDITION" id="sys_cond" name="systemCondition"/>
+        </Controller>
+      </Components>
+    </Device>
+  </Devices>
+</MTConnectDevices>
