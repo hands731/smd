@@ -106,9 +106,8 @@ async def handle_messages(websocket):
             browser_id = data.get('browser_id')
             response = json.dumps({"status": "ssh_response", "device_id": seq, "browser_id": browser_id})
             await websocket.send(response)
-            stdout, stderr = connect_ssh()
-            response = json.dumps({"status": "ssh_response", "device_id": seq, "browser_id": browser_id, "stdout": stdout, "stderr": stderr})
-            await websocket.send(response)
+            # 비동기적으로 SSH 연결을 시도
+            result = await connect_ssh()
         elif data.get('status') == 'execute_command':
             command = data.get('command')
             seq = data.get('device_id')
@@ -221,25 +220,32 @@ def update_autostart_url(new_url, seq):
 
 
 
-
-
-
-
-
-def connect_ssh():
+# 비동기적으로 SSH 연결을 시도하는 함수
+async def connect_ssh():
     os.environ["PATH"] += os.pathsep + "/usr/local/bin:/usr/bin:/bin"
     command = 'sshpass -p "jmes!20191107" ssh -N -p 4222 -o StrictHostKeyChecking=no -R 3022:localhost:3022 pi@106.240.243.250'
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    try:
-        stdout, stderr = process.communicate()
-        if process.returncode == 0:
-            print("SSH tunnel established")
-        else:
-            print("Failed to establish SSH tunnel")
-        return stdout.decode(), stderr.decode()  # bytes -> str로 변환
-    except Exception as e:
-        print("Error: {}".format(e))
-        return "", str(e)  # 에러 메시지를 stderr로 반환
+
+    # 비동기 서브 프로세스 실행
+    process = await asyncio.create_subprocess_shell(
+        command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
+    )
+    
+    # 결과 기다림
+    stdout, stderr = await process.communicate()
+    print(stdout,stderr)
+    if process.returncode == 0:
+        print("SSH tunnel established")
+    else:
+        print("Failed to establish SSH tunnel")
+
+    return process.returncode  # 리턴 코드 반환
+
+
+
+
+
 
 # 새로운 execute_command 함수 추가
 def execute_command(command):
