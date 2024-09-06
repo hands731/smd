@@ -89,21 +89,16 @@ async def handle_messages(websocket):
         elif data.get('status') == 'ssh_connect':
             seq = data.get('device_id')
             browser_id = data.get('browser_id')
-            response = {
-                "status": "ssh_response",
-                "device_id": seq,
-                "browser_id": browser_id
-            }
-            await websocket.send(json.dumps(response))  # JSON 직렬화하여 전송
-            stdout, stderr = connect_ssh()
-            response = {
-                "status": "ssh_response",
-                "device_id": seq,
-                "browser_id": browser_id,
-                "stdout": stdout,
-                "stderr": stderr
-            }
-            await websocket.send(json.dumps(response))  # JSON 직렬화하여 전송
+            result = await connect_ssh()
+
+            # 결과가 0일 때만 응답 전송
+            if result == 0:
+                response = json.dumps({
+                    "status": "ssh_response",
+                    "device_id": seq,
+                    "browser_id": browser_id,
+                })
+                await websocket.send(response)
         elif data.get('status') == 'execute_command':
             command = data.get('command')
             seq = data.get('device_id')
@@ -200,22 +195,21 @@ def update_autostart_url(new_url):
 
 
 
-def connect_ssh():
+# 비동기적으로 SSH 연결을 시도하는 함수
+async def connect_ssh():
     os.environ["PATH"] += os.pathsep + "/usr/local/bin:/usr/bin:/bin"
-    command = 'sshpass -p "jmes!20191107" ssh -N -p 4222 -o StrictHostKeyChecking=no -R 3022:localhost:22 pi@106.240.243.250'
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    try:
-        stdout, stderr = process.communicate()
-        print("STDOUT:", stdout.decode())
-        print("STDERR:", stderr.decode())
-        if process.returncode == 0:
-            print("SSH tunnel established")
-        else:
-            print("Failed to establish SSH tunnel")
-        return stdout, stderr
-    except Exception as e:
-        print("Error: {}".format(e))
-        return "", str(e)  # Add error message to stderr
+    command = 'sshpass -p "jmes!20191107" ssh -N -f -p 4222 -o StrictHostKeyChecking=no -R 3022:localhost:22 pi@106.240.243.250'
+
+    # SSH 터널을 백그라운드에서 실행하기 위해 -f 옵션 추가
+    process = subprocess.Popen(command, shell=True)
+    
+    # SSH 연결 시도 후 즉시 리턴
+    if process.returncode is None or process.returncode == 0:
+        print("SSH tunnel established")
+        return 0
+    else:
+        print("Failed to establish SSH tunnel")
+        return process.returncode
 
 def execute_command(command):
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
