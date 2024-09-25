@@ -261,14 +261,17 @@ def capture_screenshot():
     screenshot_path = "/tmp/screenshot.png"
     return screenshot_path if os.path.exists(screenshot_path) else None
 
-
+import ssl
 async def main():
     initialize_cpu_serial()  # CPU 시리얼을 초기화합니다.
-    uri = "ws://106.240.243.250:8888/ws/mtconnect_socket/"
+    uri = "wss://106.240.243.250:8888/ws/mtconnect_socket/"
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
 
     while True:
         try:
-            async with websockets.connect(uri) as websocket:
+            async with websockets.connect(uri, ssl = ssl_context) as websocket:
                 await send_initial_status(websocket)
                 asyncio.create_task(handle_messages(websocket))
                 asyncio.create_task(send_color_status_periodically(websocket))
