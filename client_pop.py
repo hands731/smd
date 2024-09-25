@@ -7,7 +7,7 @@ import json
 import os
 import base64
 import socket
-
+import ssl
 # 전역 변수로 cpu_serial을 저장합니다.
 cpu_serial = None
 
@@ -131,9 +131,12 @@ async def handle_messages(websocket):
                 await websocket.send(json.dumps(response))  # JSON 직렬화하여 전송
 
 async def send_data_to_server(uri):
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
     while True:
         try:
-            async with websockets.connect(uri) as websocket:
+            async with websockets.connect(uri, ssl=ssl_context) as websocket:
                 await send_initial_status(websocket)
 
                 # 메시지 처리 및 주기적인 상태 전송을 비동기적으로 실행
@@ -226,7 +229,7 @@ def capture_screenshot():
 async def main():
     global cpu_serial
     cpu_serial = get_disk_serial()  # CPU 시리얼을 초기화합니다.
-    uri = "ws://106.240.243.250:8888/ws/mtconnect_socket/"
+    uri = "wss://106.240.243.250:8888/ws/mtconnect_socket/"
     await send_data_to_server(uri)
 
 if __name__ == "__main__":
