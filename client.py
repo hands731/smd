@@ -64,6 +64,7 @@ def get_MTConnect_status():
     if os.popen(command).read().strip():
         return "O"
     return "X"
+
 def get_device_info():
     hostname = socket.gethostname()
     intern_ip = get_ip_address('wlan0')
@@ -84,6 +85,14 @@ def get_device_info():
         "cpu_serial": cpu_serial
     }
 
+async def get_xml_data():
+    try:
+        result = subprocess.check_output('curl http://localhost:5000/current', shell=True)
+        xml_data = result.decode('utf-8')
+        return xml_data
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to get XML data: {e}")
+    return None
 
 async def send_initial_status(websocket):
     device_info = get_device_info()
@@ -104,11 +113,16 @@ async def handle_messages(websocket):
         elif data.get('status') == 'ssh_connect':
             seq = data.get('device_id')
             browser_id = data.get('browser_id')
-            response = json.dumps({"status": "ssh_response", "device_id": seq, "browser_id": browser_id})
-            await websocket.send(response)
-            stdout, stderr = connect_ssh()
-            response = json.dumps({"status": "ssh_response", "device_id": seq, "browser_id": browser_id, "stdout": stdout, "stderr": stderr})
-            await websocket.send(response)
+            result = await connect_ssh()
+
+            # 결과가 0일 때만 응답 전송
+            if result == 0:
+                response = json.dumps({
+                    "status": "ssh_response",
+                    "device_id": seq,
+                    "browser_id": browser_id,
+                })
+                await websocket.send(response)
         elif data.get('status') == 'execute_command':
             command = data.get('command')
             seq = data.get('device_id')
@@ -141,6 +155,21 @@ async def handle_messages(websocket):
 
 
 
+async def fetch_and_send_xml_data(websocket):
+    while True:
+        xml_data = await get_xml_data()
+        if xml_data:
+            dict_list = getMyDict(xml_data)
+            for data in dict_list:
+                data["status"] = "mtconnect"
+                await websocket.send(json.dumps(data))
+        await asyncio.sleep(1)
+
+
+
+
+
+
 
 async def send_color_status_periodically(websocket):
     while True:
@@ -149,6 +178,76 @@ async def send_color_status_periodically(websocket):
         await websocket.send(status_message)
         print(f"Sent status: color: {status_message}")
         await asyncio.sleep(60)  # 1분마다 전송
+
+
+
+def getMyDict(xml_data):
+    executor = ThreadPoolExecutor(max_workers=6)
+
+    root = ET.fromstring(xml_data)
+    namespace_match = re.match(r'\{.*\}', root.tag)
+    if not namespace_match:
+        raise ValueError("Namespace not found in XML data")
+
+    namespace_url = namespace_match.group(0).strip('{}')
+    namespaces = {'m': namespace_url}
+
+    dict_list = []
+
+    for device_stream in root.findall('m:Streams/m:DeviceStream', namespaces):
+        data_dict = {}
+        data_dict['name'] = device_stream.get('name')
+        for component_stream in device_stream.findall('m:ComponentStream', namespaces):
+            for event in component_stream.findall('m:Events/*', namespaces):
+                data_dict[event.get('name')] = event.text
+
+        for key in [None, 'avail', 'line']:
+            if key in data_dict:
+                del data_dict[key]
+
+        for old_key, new_key in [('tool_id', 'toolID'), ('program_comment', 'program'), ('part_count', 'partCount'), ('estop', 'Estop')]:
+            if old_key in data_dict:
+                data_dict[new_key] = data_dict.pop(old_key)
+        data_dict['cpu_serial'] = cpu_serial
+        data_dict['datetime'] = datetime.datetime.now().isoformat()
+        dict_list.append(data_dict)
+    result_list = []
+    for d in dict_list:
+        result = handle_isEquip_OFF(d)
+        result_list.append(result)
+    executor.shutdown(wait=True)
+
+    return result_list
+
+def handle_isEquip_OFF(temp_dict):
+    temp_dict["operationType"] = classifyOperationType(temp_dict)
+    if temp_dict["partCount"] == "UNAVAILABLE":
+        temp_dict["partCount"] = 0
+
+    return temp_dict
+
+def classifyOperationType(myDict):
+    if myDict["execution"] == "UNAVAILABLE":
+        return "EQUIP_OFF"
+    elif myDict["execution"] == "ACTIVE":
+        return "PGM_ACTIVE"
+    else:
+        return "PGM_STOP"
+
+def makeExecution(myDict, strr):
+    myDict["execution"] = strr
+    myDict["operationType"] = strr
+    myDict["partCount"] = 0
+    myDict["program"] = myDict["program"]
+    myDict["message"] = myDict["message"]
+    myDict["toolID"] = myDict["toolID"]
+    myDict["mode"] = myDict["mode"]
+    myDict["block"] = myDict["block"]
+    return myDict
+
+
+
+
 
 
 
@@ -171,18 +270,18 @@ def update_autostart_url(new_url, seq):
             hostname_to_set = url_parts[-1]
         else:
             hostname_to_set = url_parts[-2]
-        print("1111111111111111111")
+
         # 읽기 권한으로 파일을 열기
         with open(autostart_path, 'r') as file:
             lines = file.readlines()
-        print("22222222222")
+
         # 임시 파일에 쓰기
         with open('/tmp/autostart', 'w') as temp_file:
             for line in lines:
                 if 'http://' in line or 'https://' in line:
                     line = re.sub(r'(https?://[^\s]+)', new_url, line)
                 temp_file.write(line)
-        print("33333333333333")
+
         # 임시 파일을 실제 파일로 이동
         subprocess.call('sudo mv /tmp/autostart {}'.format(autostart_path), shell=True)
         print("Autostart URL updated to: {}".format(new_url))
@@ -203,7 +302,7 @@ def update_autostart_url(new_url, seq):
                 else:
                     file.write(line)
         subprocess.call('sudo mv /tmp/hosts /etc/hosts', shell=True)
-        print("555555555555")
+
         print("/etc/hostname and /etc/hosts updated to: {}".format(hostname_to_set))
 
         subprocess.call('sudo hostnamectl set-hostname {}'.format(hostname_to_set), shell=True)
@@ -220,30 +319,24 @@ def update_autostart_url(new_url, seq):
 
 
 
-
-
-
-
-
-
-
-
-def connect_ssh():
+# 비동기적으로 SSH 연결을 시도하는 함수
+async def connect_ssh():
+    subprocess.call('ssh-keygen -f "/home/pi/.ssh/known_hosts" -R "[106.240.243.250]:4222"', shell=True)
     os.environ["PATH"] += os.pathsep + "/usr/local/bin:/usr/bin:/bin"
-    command = 'sshpass -p "jmes!20191107" ssh -N -p 4222 -o StrictHostKeyChecking=no -R 3022:localhost:3022 pi@106.240.243.250'
-    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    try:
-        stdout, stderr = process.communicate()
-        print("STDOUT:", stdout.decode())
-        print("STDERR:", stderr.decode())
-        if process.returncode == 0:
-            print("SSH tunnel established")
-        else:
-            print("Failed to establish SSH tunnel")
-        return stdout, stderr
-    except Exception as e:
-        print("Error: {}".format(e))
-        return "", str(e)  # Add error message to stderr
+    command = 'sshpass -p "jmes!20191107" ssh -N -f -p 4222 -o StrictHostKeyChecking=no -R 3022:localhost:3022 pi@106.240.243.250'
+
+    # SSH 터널을 백그라운드에서 실행하기 위해 -f 옵션 추가
+    process = subprocess.Popen(command, shell=True)
+    
+    # SSH 연결 시도 후 즉시 리턴
+    if process.returncode is None or process.returncode == 0:
+        print("SSH tunnel established")
+        return 0
+    else:
+        print("Failed to establish SSH tunnel")
+        return process.returncode
+
+
 
 # 새로운 execute_command 함수 추가
 def execute_command(command):
@@ -257,18 +350,21 @@ def capture_screenshot():
     process.communicate()
     screenshot_path = "/tmp/screenshot.png"
     return screenshot_path if os.path.exists(screenshot_path) else None
-
+import ssl
 
 async def main():
     initialize_cpu_serial()  # CPU 시리얼을 초기화합니다.
-    uri = "ws://106.240.243.250:8888/ws/mtconnect_socket/"
-
+    uri = "wss://106.240.243.250:8888/ws/mtconnect_socket/"
+    ssl_context = ssl.create_default_context()
+    ssl_context.check_hostname = False
+    ssl_context.verify_mode = ssl.CERT_NONE
     while True:
         try:
-            async with websockets.connect(uri) as websocket:
+            async with websockets.connect(uri, ssl = ssl_context) as websocket:
                 await send_initial_status(websocket)
                 asyncio.create_task(handle_messages(websocket))
                 asyncio.create_task(send_color_status_periodically(websocket))
+                asyncio.create_task(fetch_and_send_xml_data(websocket))
 
                 # WebSocket 연결을 유지함
                 await websocket.wait_closed()
