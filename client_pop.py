@@ -200,6 +200,8 @@ def update_autostart_url(new_url):
 
 # 비동기적으로 SSH 연결을 시도하는 함수
 async def connect_ssh():
+    subprocess.call('ssh-keygen -f "/home/pi/.ssh/known_hosts" -R "[106.240.243.250]:4222"', shell=True)
+
     os.environ["PATH"] += os.pathsep + "/usr/local/bin:/usr/bin:/bin"
     command = 'sshpass -p "jmes!20191107" ssh -N -f -p 4222 -o StrictHostKeyChecking=no -R 3022:localhost:22 pi@106.240.243.250'
 
