@@ -358,13 +358,18 @@ async def main():
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
+
     while True:
         try:
-            async with websockets.connect(uri, ssl = ssl_context) as websocket:
+            async with websockets.connect(uri, ssl=ssl_context) as websocket:
                 await send_initial_status(websocket)
                 asyncio.create_task(handle_messages(websocket))
                 asyncio.create_task(send_color_status_periodically(websocket))
-                asyncio.create_task(fetch_and_send_xml_data(websocket))
+
+                # MTConnect_OX 값이 "O"일 때만 fetch_and_send_xml_data 실행
+                device_info = get_device_info()
+                if device_info["MTConnect_OX"] == "O":
+                    asyncio.create_task(fetch_and_send_xml_data(websocket))
 
                 # WebSocket 연결을 유지함
                 await websocket.wait_closed()
