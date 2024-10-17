@@ -8,6 +8,7 @@ import os
 import base64
 import socket
 import ssl
+import requests
 # 전역 변수로 cpu_serial을 저장합니다.
 cpu_serial = None
 
