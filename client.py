@@ -13,7 +13,7 @@ import base64
 import socket
 from collections import Counter
 import requests
-
+import sys
 
 # 전역 변수로 cpu_serial을 저장합니다.
 cpu_serial = None
@@ -354,16 +354,18 @@ def capture_screenshot():
     return screenshot_path if os.path.exists(screenshot_path) else None
 import ssl
 
+
 async def get_jwt_token(username, password, device_id):
     url = "https://106.240.243.250:8888/api/get_jwt_token/"
     data = {"username": username, "password": password, "device_id": device_id}
     response = requests.post(url, json=data, verify=False)
     if response.status_code == 200:
         return response.json()['access']
+    elif response.status_code == 400:
+        print("Authentication failed. Exiting program.")
+        sys.exit(1)  # Exit the program with a non-zero status code
     else:
-        raise Exception("Failed to get device token")
-
-
+        raise Exception(f"Failed to get device token. Status code: {response.status_code}")
 
 async def main():
     initialize_cpu_serial()  # CPU 시리얼을 초기화합니다.
@@ -375,6 +377,7 @@ async def main():
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
+
     while True:
         try:
             jwt_token = await get_jwt_token(username, password, device_id)
@@ -398,6 +401,7 @@ async def main():
         except Exception as e:
             print(f"Unexpected error: {e}. Reconnecting in 10 seconds...")
             await asyncio.sleep(10)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
