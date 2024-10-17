@@ -228,10 +228,23 @@ def capture_screenshot():
     screenshot_path = "/tmp/screenshot.png"
     return screenshot_path if os.path.exists(screenshot_path) else None
 
+async def get_jwt_token(username, password, device_id):
+    url = "https://if.tomes.co.kr:8005/api/get_jwt_token/"
+    data = {"username": username, "password": password, "device_id": device_id}
+    response = requests.post(url, json=data, verify=False)
+    if response.status_code == 200:
+        return response.json()['access']
+    else:
+        raise Exception("Failed to get device token")
+
 async def main():
     global cpu_serial
+    username = "smd_device"
+    password = "tomes@@123"
+    device_id = cpu_serial  # CPU 시리얼 번호를 디바이스 ID로 사용
+    jwt_token = await get_jwt_token(username, password, device_id)
     cpu_serial = get_disk_serial()  # CPU 시리얼을 초기화합니다.
-    uri = "wss://106.240.243.250:8888/ws/mtconnect_socket/"
+    uri = "wss://106.240.243.250:8005/ws/mtconnect_socket/?token="+jwt_token
     await send_data_to_server(uri)
 
 if __name__ == "__main__":
