@@ -12,6 +12,8 @@ import os
 import base64
 import socket
 from collections import Counter
+import requests
+
 
 # 전역 변수로 cpu_serial을 저장합니다.
 cpu_serial = None
@@ -352,20 +354,36 @@ def capture_screenshot():
     return screenshot_path if os.path.exists(screenshot_path) else None
 import ssl
 
+async def get_jwt_token(username, password, device_id):
+    url = "https://if.tomes.co.kr:8888/api/get_jwt_token/"
+    data = {"username": username, "password": password, "device_id": device_id}
+    response = requests.post(url, json=data, verify=False)
+    if response.status_code == 200:
+        return response.json()['access']
+    else:
+        raise Exception("Failed to get device token")
+
+
+
 async def main():
     initialize_cpu_serial()  # CPU 시리얼을 초기화합니다.
-    uri = "wss://106.240.243.250:8888/ws/mtconnect_socket/"
+
+    username = "smd_device"
+    password = "tomes@@123"
+    device_id = cpu_serial  # CPU 시리얼 번호를 디바이스 ID로 사용
+
     ssl_context = ssl.create_default_context()
     ssl_context.check_hostname = False
     ssl_context.verify_mode = ssl.CERT_NONE
-
     while True:
         try:
-            async with websockets.connect(uri, ssl=ssl_context) as websocket:
+            jwt_token = await get_jwt_token(username, password, device_id)
+            uri = "wss://106.240.243.250:8888/ws/mtconnect_socket/?token="+jwt_token
+            print(jwt_token)
+            async with websockets.connect(uri, ssl = ssl_context) as websocket:
                 await send_initial_status(websocket)
                 asyncio.create_task(handle_messages(websocket))
                 asyncio.create_task(send_color_status_periodically(websocket))
-
                 # MTConnect_OX 값이 "O"일 때만 fetch_and_send_xml_data 실행
                 device_info = get_device_info()
                 if device_info["MTConnect_OX"] == "O":
