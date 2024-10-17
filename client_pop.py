@@ -239,6 +239,7 @@ async def get_jwt_token(username, password, device_id):
         raise Exception("Failed to get device token")
 
 async def main():
+    global cpu_serial
     username = "smd_device"
     password = "tomes@@123"
     cpu_serial = get_disk_serial()  # CPU 시리얼을 초기화합니다.
