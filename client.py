@@ -355,7 +355,7 @@ def capture_screenshot():
 import ssl
 
 async def get_jwt_token(username, password, device_id):
-    url = "https://if.tomes.co.kr:8888/api/get_jwt_token/"
+    url = "https://106.240.243.250:8888/api/get_jwt_token/"
     data = {"username": username, "password": password, "device_id": device_id}
     response = requests.post(url, json=data, verify=False)
     if response.status_code == 200:
