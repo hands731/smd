@@ -355,7 +355,7 @@ def capture_screenshot():
 import ssl
 
 async def get_jwt_token(username, password, device_id):
-    url = "https://if.tomes.co.kr:8005/api/get_jwt_token/"
+    url = "https://if.tomes.co.kr:8888/api/get_jwt_token/"
     data = {"username": username, "password": password, "device_id": device_id}
     response = requests.post(url, json=data, verify=False)
     if response.status_code == 200:
@@ -378,7 +378,7 @@ async def main():
     while True:
         try:
             jwt_token = await get_jwt_token(username, password, device_id)
-            uri = "wss://106.240.243.250:8005/ws/mtconnect_socket/?token="+jwt_token
+            uri = "wss://106.240.243.250:8888/ws/mtconnect_socket/?token="+jwt_token
             print(jwt_token)
             async with websockets.connect(uri, ssl = ssl_context) as websocket:
                 await send_initial_status(websocket)
