@@ -235,8 +235,11 @@ async def get_jwt_token(username, password, device_id):
     response = requests.post(url, json=data, verify=False)
     if response.status_code == 200:
         return response.json()['access']
+    elif response.status_code == 400:
+        print("Authentication failed. Exiting program.")
+        sys.exit(1)  # Exit the program with a non-zero status code
     else:
-        raise Exception("Failed to get device token")
+        raise Exception(f"Failed to get device token. Status code: {response.status_code}")
 
 async def main():
     global cpu_serial
