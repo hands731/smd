@@ -54,9 +54,10 @@ def get_url_from_autostart():
     return ''
 
 def get_device_info():
-    hostname = socket.gethostname()
-    intern_ip = get_ip_address()  # 동적으로 네트워크 인터페이스 이름을 가져와 사용
     url = get_url_from_autostart()
+    # URL의 마지막 부분을 hostname으로 사용
+    hostname = url.rstrip('/').split('/')[-1] if url else socket.gethostname()
+    intern_ip = get_ip_address()
 
     return {
         "name": hostname,
