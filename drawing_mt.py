@@ -250,50 +250,41 @@ def makeExecution(myDict, strr):
 
 
 
-
-
-
 def update_autostart_url(new_url, seq):
+    # 함수 시작 시 현재 호스트네임 저장
+    original_hostname = getHostName()
+    
     autostart_path = "/home/pi/.config/lxsession/LXDE-pi/autostart"
     autostart_org_path = "/home/pi/.config/lxsession/LXDE-pi/autostart.org"
-
     if os.path.isfile(autostart_org_path):
         subprocess.call('sudo mv {} {}'.format(autostart_org_path, autostart_path), shell=True)
         print("Renamed autostart.org to autostart")
-
     try:
         subprocess.call('sudo rm -rf /home/pi/.config/chromium/Singleton*', shell=True)
         print("Removed lock files")
-
         time.sleep(2)
-
         url_parts = new_url.split('/')
         if url_parts[-1]:
             hostname_to_set = url_parts[-1]
         else:
             hostname_to_set = url_parts[-2]
-
         # 읽기 권한으로 파일을 열기
         with open(autostart_path, 'r') as file:
             lines = file.readlines()
-
         # 임시 파일에 쓰기
         with open('/tmp/autostart', 'w') as temp_file:
             for line in lines:
                 if 'http://' in line or 'https://' in line:
                     line = re.sub(r'(https?://[^\s]+)', new_url, line)
                 temp_file.write(line)
-
         # 임시 파일을 실제 파일로 이동
         subprocess.call('sudo mv /tmp/autostart {}'.format(autostart_path), shell=True)
         print("Autostart URL updated to: {}".format(new_url))
-
         # 호스트네임 설정
         with open('/tmp/hostname', 'w') as file:
             file.write(hostname_to_set + '\n')
         subprocess.call('sudo mv /tmp/hostname /etc/hostname', shell=True)
         print("System hostname updated to: {}".format(hostname_to_set))
-
         # /etc/hosts 파일 업데이트
         with open('/etc/hosts', 'r') as file:
             lines = file.readlines()
@@ -304,19 +295,26 @@ def update_autostart_url(new_url, seq):
                 else:
                     file.write(line)
         subprocess.call('sudo mv /tmp/hosts /etc/hosts', shell=True)
-
         print("/etc/hostname and /etc/hosts updated to: {}".format(hostname_to_set))
-
         subprocess.call('sudo hostnamectl set-hostname {}'.format(hostname_to_set), shell=True)
-
-        # 시스템 재부팅 주석 처리
+        
+        # 호스트네임 변경에 따른 디렉토리 이름 변경 (원래 호스트네임 사용)
+        strr = "cd /home/JS/; sudo mv " + original_hostname + " " + hostname_to_set
+        subprocess.call(strr, shell=True)
+        print("Directory renamed from {} to {}".format(original_hostname, hostname_to_set))
+        
+        # 시스템 재부팅
         subprocess.call('sudo reboot', shell=True)
         #print("System rebooting... (not actually rebooted)")
-
     except FileNotFoundError:
         print("Autostart file not found")
     except Exception as e:
         print("Error updating autostart URL: {}".format(e))
+
+def getHostName():
+    return subprocess.check_output('cat /etc/hostname', shell=True).decode('utf-8').strip()
+
+
 
 
 
