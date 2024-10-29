@@ -230,7 +230,13 @@ def handle_isEquip_OFF(temp_dict):
 
 def classifyOperationType(myDict):
     if myDict["execution"] == "UNAVAILABLE":
-        return "EQUIP_OFF"
+        # eth0의 IP 주소 확인
+        eth0_ip = get_ip_address('eth0')
+        # eth0에 IP가 있으면 CNC_ERROR, 없으면 EQUIP_OFF
+        if eth0_ip:
+            return "CNC_ERROR"
+        else:
+            return "EQUIP_OFF"
     elif myDict["execution"] == "ACTIVE":
         return "PGM_ACTIVE"
     else:
