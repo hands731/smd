@@ -48,16 +48,39 @@ def run_udevadm():
             else:
                 print("does not contain 'ch341-uart'")
         except subprocess.CalledProcessError as e:
-            print(f"An error occurred for {device_name}: {e}")
+            print(f"An error occurred for : {e}")
+            # Add equipment off API call
+            try:
+                data = {
+                    "name": hostname,
+                    "cpu_serial": cpu_serial
+                }
+                requests.post(send_URL.replace('/Serial', '/equip_off'), json=data)
+            except:
+                print("Failed to send equip_off signal")
     return
 
 
+initialize_cpu_serial()
+
 usb_num = run_udevadm()
+if usb_num is None:  # USB를 찾지 못했을 때
+    try:
+        data = {
+            "name": hostname,
+            "cpu_serial": cpu_serial,
+            "partCount": int(read_file("/home/pi/Current/partCount.txt").strip())
+        }
+        requests.post(send_URL.replace('/Serial', '/equip_off'), json=data)
+    except:
+        print("Failed to send equip_off signal")
+    exit()
+
 try:
-        ser = serial.Serial('/dev/ttyUSB'+usb_num, 9600) # 포트와 전송 속도에 맞게 설정
+    ser = serial.Serial('/dev/ttyUSB'+usb_num, 9600)
 except serial.SerialException as e:
-        print(f"Error opening serial port: {e}")
-        exit()
+    print(f"Error opening serial port: {e}")
+    exit()
 
 
 
@@ -145,8 +168,6 @@ def sendIFServer(data):
 
 
 if __name__ == "__main__":
-    initialize_cpu_serial()
-
     # 두 개의 스레드 생성
     t1 = threading.Thread(target=read_data)
     t2 = threading.Thread(target=processing)
